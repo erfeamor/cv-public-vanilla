@@ -1,0 +1,12 @@
+{
+  "name": "cv-public-vanilla",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:20",
+  "postCreateCommand": "npm install",
+  "forwardPorts": [4173],
+  "customizations": {
+    "vscode": {
+      "extensions": ["dbaeumer.vscode-eslint", "vitest.explorer"]
+    }
+  },
+  "remoteUser": "node"
+}

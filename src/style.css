@@ -1,0 +1,23 @@
+:root {
+  color-scheme: light dark;
+  font-family: system-ui, sans-serif;
+}
+
+body {
+  margin: 0;
+  display: flex;
+  justify-content: center;
+  padding: 2rem;
+}
+
+.cv-card {
+  max-width: 40rem;
+}
+
+.cv-card .headline {
+  font-weight: 600;
+}
+
+.cv-card .location {
+  color: gray;
+}
