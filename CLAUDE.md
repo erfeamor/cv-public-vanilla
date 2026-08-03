@@ -22,6 +22,19 @@ CI: `.github/workflows/ci.yml` (lint → test → build → dist artifact).
 - Env: `VITE_BFF_URL`, `VITE_PERSON_ID` via `import.meta.env` (Vitest handles `import.meta` natively — no babel workaround needed here, unlike cv-admin-react).
 - No dependencies without a strong reason: the `devDependencies` list is the whole toolchain, `dependencies` is empty and should stay empty.
 
+## Code review guidance
+
+Priorities, ranked:
+
+1. **Unescaped interpolation.** Any new renderer inserting a value into the returned HTML string without going through `escapeHtml` is a hard blocker — this is the repo's only XSS defense, since there's no framework auto-escaping.
+2. **Missing the test trio.** A new section renderer without happy-path, optional-field-omission, and XSS-escape tests (the `cvCard.test.js` pattern) is incomplete.
+3. **Empty section handling.** A section that renders an empty heading/wrapper when its data array is empty — the convention is to render nothing, and that must be asserted in a test, not just "look right" visually.
+4. Any new runtime `dependencies` entry — flag it explicitly; this repo's `dependencies` list is meant to stay empty (devDependencies-only toolchain).
+
+Don't flag:
+- DOM-free, string-returning render functions — that's the deliberate pattern here, not a missed component-framework opportunity.
+- No Web Components / animations — noted as backlog, not a gap in this PR's scope.
+
 ## Git workflow
 
 `master` is protected — feature branch (`feat/…`) → push → PR via `gh`. Definition of done: renderer tests (incl. XSS case), lint clean, build succeeds.
