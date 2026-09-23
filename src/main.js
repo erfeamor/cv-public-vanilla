@@ -7,7 +7,7 @@ async function main() {
   const app = document.getElementById('app');
 
   try {
-    const response = await fetch(`${BFF_URL}/api/v1/people/${PERSON_ID}`);
+    const response = await fetch(`${BFF_URL}/bff/api/v1/people/${PERSON_ID}`);
     if (!response.ok) {
       throw new Error(`BFF responded with ${response.status}`);
     }
