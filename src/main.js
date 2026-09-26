@@ -1,4 +1,5 @@
 import { renderCvCard } from './cvCard';
+import { escapeHtml } from './escapeHtml';
 import { renderEducation, renderExperience, renderProjects, renderSkills } from './sections';
 
 const BFF_URL = import.meta.env.VITE_BFF_URL || 'http://localhost:3000';
@@ -22,7 +23,7 @@ async function main() {
       renderProjects(cv.projects),
     ].join('\n');
   } catch (err) {
-    app.innerHTML = `<p role="alert">Could not load résumé: ${err.message}</p>`;
+    app.innerHTML = `<p role="alert">Could not load résumé: ${escapeHtml(err.message)}</p>`;
   }
 }
 

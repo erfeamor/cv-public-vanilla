@@ -221,3 +221,15 @@ describe('renderProjects', () => {
     expect(html).toContain('class="repo"');
   });
 });
+
+describe('list semantics', () => {
+  // style.css sets list-style: none, which drops list semantics in Safari/VoiceOver
+  it.each([
+    ['renderExperience', () => renderExperience([{ company: 'A', role: 'B', location: null, startDate: '2022-01-01', endDate: null, description: null }])],
+    ['renderEducation', () => renderEducation([{ institution: 'A', degree: 'B', fieldOfStudy: null, startDate: '2022-01-01', endDate: null }])],
+    ['renderSkills', () => renderSkills([{ name: 'A', category: null, proficiency: 'EXPERT' }])],
+    ['renderProjects', () => renderProjects([{ name: 'A', description: null, repoUrl: null, startDate: null, endDate: null }])],
+  ])('%s marks its list with role="list"', (_, render) => {
+    expect(render()).toContain('<ul role="list">');
+  });
+});

@@ -65,7 +65,7 @@ function renderSection(className, heading, items, renderItem) {
   return `
     <section class="cv-section ${className}">
       <h2>${heading}</h2>
-      <ul>${items.map(renderItem).join('')}
+      <ul role="list">${items.map(renderItem).join('')}
       </ul>
     </section>
   `.trim();

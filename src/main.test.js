@@ -105,6 +105,16 @@ describe('main', () => {
     expect(alert.textContent).toBe('Could not load résumé: BFF responded with 404');
   });
 
+  it('escapes markup in the error message before rendering the alert', async () => {
+    fetchMock.mockRejectedValue(new Error('<img src=x onerror="alert(1)">'));
+
+    const app = await runMain();
+
+    expect(app.querySelector('img')).toBeNull();
+    const alert = app.querySelector('[role="alert"]');
+    expect(alert.textContent).toBe('Could not load résumé: <img src=x onerror="alert(1)">');
+  });
+
   it('renders the alert when fetch rejects', async () => {
     fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
 
