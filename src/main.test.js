@@ -47,6 +47,26 @@ describe('main', () => {
     expect(fetchMock.mock.calls[0][0]).toBe('http://localhost:3000/bff/api/v1/people/1/cv');
   });
 
+  it('calls the BFF same-origin (relative /bff/api/v1) in a production build with no VITE_BFF_URL', async () => {
+    vi.stubEnv('VITE_BFF_URL', undefined);
+    vi.stubEnv('PROD', true);
+    vi.stubEnv('DEV', false);
+    fetchMock.mockResolvedValue({ ok: true, json: async () => aggregate() });
+
+    await runMain();
+
+    expect(fetchMock.mock.calls[0][0]).toBe('/bff/api/v1/people/1/cv');
+  });
+
+  it('strips a trailing slash from VITE_BFF_URL so the request never hits //bff', async () => {
+    vi.stubEnv('VITE_BFF_URL', 'https://cv.example.com/');
+    fetchMock.mockResolvedValue({ ok: true, json: async () => aggregate() });
+
+    await runMain();
+
+    expect(fetchMock.mock.calls[0][0]).toBe('https://cv.example.com/bff/api/v1/people/1/cv');
+  });
+
   it('renders the header card and all four sections from the one payload, and no alert', async () => {
     fetchMock.mockResolvedValue({ ok: true, json: async () => aggregate() });
 

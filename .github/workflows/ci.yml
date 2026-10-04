@@ -5,6 +5,10 @@ on:
     branches: [main, master]
   pull_request:
 
+# Least privilege by default; only the deploy job widens this (OIDC token).
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -21,10 +25,99 @@ jobs:
       - run: npm test
       - run: npm run build
 
+      # A production bundle must never call the visitor's own machine. With no
+      # VITE_BFF_URL the build uses same-origin /bff/... calls (src/bffUrl.js);
+      # this fails the PR if a localhost fallback ever leaks back in.
+      - name: Fail if dist/ references localhost:3000
+        run: |
+          if grep -rn "localhost:3000" dist/; then
+            echo "::error::dist/ contains localhost:3000 — the bundle would fetch from the visitor's machine"
+            exit 1
+          fi
+
       - uses: actions/upload-artifact@v4
         with:
           name: dist
           path: dist/
 
-  # Placeholder until cv-infra outputs the bucket/distribution IDs:
-  # deploy job syncs dist/ to S3 and invalidates CloudFront on main.
+  # Publishes the tested dist/ to the ROOT of the shared frontend bucket and
+  # invalidates the edge. The live admin (cv-admin-react) lives under admin/ in
+  # the same bucket: every sync below carries --exclude "admin/*" so --delete
+  # can never touch it (the deploy role also has an explicit Deny on admin/*,
+  # T-045, as a second guard — not relied on here).
+  deploy:
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # GitHub OIDC -> sts:AssumeRoleWithWebIdentity
+      contents: read
+    # Never run two deploys against the bucket at once; queue, don't cancel.
+    concurrency:
+      group: deploy-public-vanilla
+      cancel-in-progress: false
+    # Non-secret constants, versioned here so any change to the deploy target
+    # goes through PR review (a repo variable could change out-of-band).
+    # The role ARN is account-specific and comes from the repo variable.
+    env:
+      AWS_REGION: eu-west-3
+      S3_BUCKET: cv-project-frontend-dev
+      CLOUDFRONT_DISTRIBUTION_ID: E2AV0INGJW1UO2
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Fail if dist/ references localhost:3000
+        run: |
+          if grep -rn "localhost:3000" dist/; then
+            echo "::error::dist/ contains localhost:3000 — refusing to deploy"
+            exit 1
+          fi
+
+      - name: Require the deploy role variable
+        env:
+          ROLE_ARN: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+        run: |
+          if [ -z "$ROLE_ARN" ]; then
+            echo "::error::repo variable AWS_DEPLOY_ROLE_ARN is not set"
+            exit 1
+          fi
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # Two passes so caching can differ by file:
+      # 1) everything except index.html (Vite's content-hashed assets/) is
+      #    long-cached and immutable; uploaded first and without --delete, so
+      #    the new index.html never points at assets that aren't there yet.
+      # 2) index.html with no-cache (browsers revalidate, so a deploy shows up
+      #    without a hard refresh), plus --delete to prune stale hashed assets
+      #    and strays at the root. Files pass 1 just uploaded are newer in S3
+      #    than locally and the same size, so pass 2 skips them.
+      - name: Sync hashed assets (long cache)
+        run: >
+          aws s3 sync dist/ "s3://${S3_BUCKET}/"
+          --exclude "admin/*"
+          --exclude "index.html"
+          --cache-control "public, max-age=31536000, immutable"
+
+      - name: Sync index.html (no-cache) and prune stale files
+        run: >
+          aws s3 sync dist/ "s3://${S3_BUCKET}/"
+          --delete
+          --exclude "admin/*"
+          --cache-control "no-cache"
+
+      # The edge (spa-router.js) rewrites "/" and every extension-less route to
+      # /index.html, so that is the only cache key that changes per deploy;
+      # hashed assets get new names. "/" is listed as a cheap belt-and-braces.
+      # Deliberately not "/*": that would also flush the admin's cached files.
+      - name: Invalidate CloudFront
+        run: >
+          aws cloudfront create-invalidation
+          --distribution-id "${CLOUDFRONT_DISTRIBUTION_ID}"
+          --paths "/index.html" "/"

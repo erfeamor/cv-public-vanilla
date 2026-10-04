@@ -1,8 +1,14 @@
 import { renderCvCard } from './cvCard';
+import { resolveBffBaseUrl } from './bffUrl';
 import { escapeHtml } from './escapeHtml';
 import { renderEducation, renderExperience, renderProjects, renderSkills } from './sections';
 
-const BFF_URL = import.meta.env.VITE_BFF_URL || 'http://localhost:3000';
+// Pass the fields explicitly (not the whole import.meta.env object) so Vite
+// statically replaces each one at build time.
+const BFF_URL = resolveBffBaseUrl({
+  VITE_BFF_URL: import.meta.env.VITE_BFF_URL,
+  PROD: import.meta.env.PROD,
+});
 const PERSON_ID = import.meta.env.VITE_PERSON_ID || '1';
 
 async function main() {

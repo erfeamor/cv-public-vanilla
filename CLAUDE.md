@@ -12,14 +12,18 @@ npm run dev                # :4173 (cp .env.example .env first)
 npm run build              # static bundle (deploy target: S3+CloudFront)
 ```
 
-CI: `.github/workflows/ci.yml` (lint → test → build → dist artifact).
+CI: `.github/workflows/ci.yml` (lint → test → build → localhost grep → dist artifact; then `deploy` on `master` pushes only).
+
+**Deploy:** GitHub OIDC role from the repo variable `AWS_DEPLOY_ROLE_ARN` (no static keys). Syncs to the **root** of `cv-project-frontend-dev`, **never `admin/`** (cv-admin-react's prefix): every `aws s3 sync` carries `--exclude "admin/*"`, and keep it that way. Hashed assets are long-cached, `index.html` is `no-cache`, and the invalidation is `/index.html` + `/`. See README.
+
+**BFF URL** (`src/bffUrl.js`): a production build without `VITE_BFF_URL` calls `/bff/...` relative (same origin). Dev falls back to `http://localhost:3000`, and that literal is guarded by `import.meta.env.DEV` so it's dropped from `dist/`. An explicit value wins, with trailing slashes stripped. CI fails on `localhost:3000` in `dist/`.
 
 ## Architecture & conventions — the pattern is the law here
 
 - **Rendering = pure functions returning HTML strings**, DOM-free, one per concern (`src/cvCard.js` is the reference). This is what makes them unit-testable without a framework. New sections: same shape, composed in `src/main.js`, which owns the single fetch + mount into `#app`.
 - **Every interpolated value goes through HTML escaping** (`escapeHtml` in `cvCard.js`). Each renderer's test suite includes an XSS case (`<script>` in input → escaped in output) — `cvCard.test.js` shows the required trio: happy path, optional-field omission, escape.
 - Empty data renders nothing (no empty section headings), and that is asserted in tests.
-- Env: `VITE_BFF_URL`, `VITE_PERSON_ID` via `import.meta.env` (Vitest handles `import.meta` natively — no babel workaround needed here, unlike cv-admin-react).
+- Env: `VITE_BFF_URL` (optional, see above), `VITE_PERSON_ID` via `import.meta.env` (Vitest handles `import.meta` natively — no babel workaround needed here, unlike cv-admin-react).
 - No dependencies without a strong reason: the `devDependencies` list is the whole toolchain, `dependencies` is empty and should stay empty.
 
 ## Code review guidance
